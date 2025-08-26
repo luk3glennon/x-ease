@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Package, 
   Clock, 
@@ -7,7 +7,10 @@ import {
   Phone,
   Calendar,
   Search,
-  Filter
+  Filter,
+  Mail,
+  MessageSquare,
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,65 +18,68 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { CustomerOrder } from '@/types/pharmacy';
+import { OrderDetailDrawer } from '@/components/OrderDetailDrawer';
+import { usePharmacyData } from '@/hooks/usePharmacyData';
+import { formatDistanceToNow } from 'date-fns';
+import type { CustomerOrder } from '@/hooks/usePharmacyData';
 
 export function CustomerOrders() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  
+  const { 
+    customerOrders, 
+    loading, 
+    fetchData, 
+    updateOrderStatus
+  } = usePharmacyData();
 
-  // Mock data
-  const orders: CustomerOrder[] = [
-    {
-      id: '1',
-      pharmacyId: 'ph1',
-      customerName: 'Alice Brown',
-      customerPhone: '(555) 111-2222',
-      itemName: 'Insulin pen refills',
-      orderType: 'special_order',
-      status: 'awaiting_arrival',
-      dateOrdered: '2024-01-12T09:00:00Z',
-      expectedDate: '2024-01-18T00:00:00Z',
-      notes: 'Customer needs specific brand'
-    },
-    {
-      id: '2',
-      pharmacyId: 'ph1',
-      customerName: 'Robert Davis',
-      customerPhone: '(555) 333-4444',
-      itemName: 'Metformin 500mg prescription',
-      orderType: 'missed_pickup',
-      status: 'ready_for_collection',
-      dateOrdered: '2024-01-10T14:30:00Z',
-      notes: 'Ready since Monday'
-    },
-    {
-      id: '3',
-      pharmacyId: 'ph1',
-      customerName: 'Maria Garcia',
-      customerPhone: '(555) 555-6666',
-      itemName: 'Blood pressure monitor',
-      orderType: 'back_order',
-      status: 'overdue',
-      dateOrdered: '2024-01-08T11:15:00Z',
-      expectedDate: '2024-01-15T00:00:00Z',
-      notes: 'Supplier delayed shipment'
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const getDaysOverdue = (arrivedAt: string | undefined) => {
+    if (!arrivedAt) return 0;
+    const arrived = new Date(arrivedAt);
+    const now = new Date();
+    const diffTime = now.getTime() - arrived.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const getRowHighlight = (order: CustomerOrder) => {
+    if (order.status === 'ready_for_collection' && order.arrived_at) {
+      const daysOverdue = getDaysOverdue(order.arrived_at);
+      if (daysOverdue >= 7) return 'bg-red-50 border-l-4 border-l-red-500';
+      if (daysOverdue >= 3) return 'bg-amber-50 border-l-4 border-l-amber-500';
     }
-  ];
+    return '';
+  };
+
+  const handleMarkArrived = async (orderId: string) => {
+    await updateOrderStatus(orderId, 'ready_for_collection');
+  };
+
+  const handleMarkCollected = async (orderId: string) => {
+    await updateOrderStatus(orderId, 'collected');
+  };
 
   const getStatusBadge = (status: CustomerOrder['status']) => {
     switch (status) {
       case 'awaiting_arrival':
-        return <Badge className="status-badge status-pending">Awaiting Arrival</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800">Awaiting Arrival</Badge>;
       case 'ready_for_collection':
-        return <Badge className="status-badge status-ready">Ready for Collection</Badge>;
+        return <Badge className="bg-green-100 text-green-800">Ready for Collection</Badge>;
+      case 'collected':
+        return <Badge className="bg-gray-100 text-gray-800">Collected</Badge>;
       case 'overdue':
-        return <Badge className="status-badge status-overdue">Overdue</Badge>;
+        return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
       default:
         return <Badge variant="secondary">Unknown</Badge>;
     }
   };
 
-  const getOrderTypeIcon = (type: CustomerOrder['orderType']) => {
+  const getOrderTypeIcon = (type: CustomerOrder['order_type']) => {
     switch (type) {
       case 'special_order':
         return <Package className="h-4 w-4 text-blue-500" />;
@@ -86,7 +92,7 @@ export function CustomerOrders() {
     }
   };
 
-  const getOrderTypeLabel = (type: CustomerOrder['orderType']) => {
+  const getOrderTypeLabel = (type: CustomerOrder['order_type']) => {
     switch (type) {
       case 'special_order':
         return 'Special Order';
@@ -108,43 +114,57 @@ export function CustomerOrders() {
   };
 
   const filterOrdersByTab = (orders: CustomerOrder[], tab: string) => {
+    let filtered = orders;
+    
     switch (tab) {
       case 'awaiting':
-        return orders.filter(order => order.status === 'awaiting_arrival');
+        filtered = orders.filter(order => order.status === 'awaiting_arrival');
+        break;
       case 'ready':
-        return orders.filter(order => order.status === 'ready_for_collection');
-      case 'overdue':
-        return orders.filter(order => order.status === 'overdue');
+        filtered = orders.filter(order => order.status === 'ready_for_collection');
+        filtered = filtered.sort((a, b) => {
+          const aDays = getDaysOverdue(a.arrived_at);
+          const bDays = getDaysOverdue(b.arrived_at);
+          return bDays - aDays;
+        });
+        break;
+      case 'collected':
+        filtered = orders.filter(order => order.status === 'collected');
+        break;
       default:
-        return orders;
+        filtered = orders;
     }
+    
+    return filtered;
   };
 
-  const filteredOrders = filterOrdersByTab(orders, activeTab).filter(order =>
-    order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.itemName.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredOrders = filterOrdersByTab(customerOrders, activeTab).filter(order =>
+    order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    order.item_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getTabCounts = () => {
     return {
-      all: orders.length,
-      awaiting: orders.filter(o => o.status === 'awaiting_arrival').length,
-      ready: orders.filter(o => o.status === 'ready_for_collection').length,
-      overdue: orders.filter(o => o.status === 'overdue').length
+      all: customerOrders.length,
+      awaiting: customerOrders.filter(o => o.status === 'awaiting_arrival').length,
+      ready: customerOrders.filter(o => o.status === 'ready_for_collection').length,
+      collected: customerOrders.filter(o => o.status === 'collected').length
     };
   };
 
   const tabCounts = getTabCounts();
 
+  if (loading) {
+    return <div className="p-6">Loading orders...</div>;
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">Customer Orders</h1>
         <p className="text-gray-600 mt-1">Track special orders, missed pickups, and back orders</p>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -155,7 +175,7 @@ export function CustomerOrders() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Special Orders</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {orders.filter(o => o.orderType === 'special_order').length}
+                  {customerOrders.filter(o => o.order_type === 'special_order').length}
                 </p>
               </div>
             </div>
@@ -171,7 +191,7 @@ export function CustomerOrders() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Missed Pickups</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {orders.filter(o => o.orderType === 'missed_pickup').length}
+                  {customerOrders.filter(o => o.order_type === 'missed_pickup').length}
                 </p>
               </div>
             </div>
@@ -187,7 +207,7 @@ export function CustomerOrders() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Back Orders</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {orders.filter(o => o.orderType === 'back_order').length}
+                  {customerOrders.filter(o => o.order_type === 'back_order').length}
                 </p>
               </div>
             </div>
@@ -195,7 +215,6 @@ export function CustomerOrders() {
         </Card>
       </div>
 
-      {/* Search */}
       <Card>
         <CardContent className="p-4">
           <div className="flex gap-4">
@@ -217,10 +236,9 @@ export function CustomerOrders() {
         </CardContent>
       </Card>
 
-      {/* Orders Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all" className="relative">
+          <TabsTrigger value="all">
             All Orders
             {tabCounts.all > 0 && (
               <Badge variant="secondary" className="ml-2 text-xs">
@@ -228,27 +246,27 @@ export function CustomerOrders() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="awaiting" className="relative">
-            Awaiting Arrival
+          <TabsTrigger value="awaiting">
+            Awaiting
             {tabCounts.awaiting > 0 && (
               <Badge variant="secondary" className="ml-2 text-xs">
                 {tabCounts.awaiting}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="ready" className="relative">
-            Ready for Collection
+          <TabsTrigger value="ready">
+            Ready
             {tabCounts.ready > 0 && (
               <Badge variant="secondary" className="ml-2 text-xs">
                 {tabCounts.ready}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="overdue" className="relative">
-            Overdue
-            {tabCounts.overdue > 0 && (
-              <Badge variant="destructive" className="ml-2 text-xs">
-                {tabCounts.overdue}
+          <TabsTrigger value="collected">
+            Collected
+            {tabCounts.collected > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {tabCounts.collected}
               </Badge>
             )}
           </TabsTrigger>
@@ -271,67 +289,94 @@ export function CustomerOrders() {
                 </TableHeader>
                 <TableBody>
                   {filteredOrders.map((order) => (
-                    <TableRow key={order.id} className="hover:bg-gray-50">
-                      <TableCell>
-                        <div>
-                          <div className="font-medium text-gray-900">{order.customerName}</div>
-                          <div className="text-sm text-gray-600 flex items-center">
-                            <Phone className="h-3 w-3 mr-1" />
-                            {order.customerPhone}
+                    <OrderDetailDrawer key={order.id} order={order}>
+                      <TableRow className={`hover:bg-gray-50 cursor-pointer ${getRowHighlight(order)}`}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-gray-900">{order.customer_name}</div>
+                            {order.customer_phone && (
+                              <div className="text-sm text-gray-600 flex items-center">
+                                <Phone className="h-3 w-3 mr-1" />
+                                {order.customer_phone}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium text-gray-900">{order.itemName}</div>
-                          {order.notes && (
-                            <div className="text-sm text-gray-600">{order.notes}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          {getOrderTypeIcon(order.orderType)}
-                          <span className="text-sm">{getOrderTypeLabel(order.orderType)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(order.status)}
-                      </TableCell>
-                      <TableCell className="text-gray-600">
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{formatDate(order.dateOrdered)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-gray-600">
-                        {order.expectedDate ? (
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-gray-900">{order.item_name}</div>
+                            {order.notes && (
+                              <div className="text-sm text-gray-600">{order.notes}</div>
+                            )}
+                            {order.status === 'ready_for_collection' && order.arrived_at && (
+                              <div className="text-xs text-red-600 mt-1">
+                                {getDaysOverdue(order.arrived_at)} days overdue
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {getOrderTypeIcon(order.order_type)}
+                            <span className="text-sm">{getOrderTypeLabel(order.order_type)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(order.status)}
+                        </TableCell>
+                        <TableCell className="text-gray-600">
                           <div className="flex items-center space-x-1">
                             <Calendar className="h-3 w-3" />
-                            <span>{formatDate(order.expectedDate)}</span>
+                            <span>{formatDate(order.date_ordered)}</span>
                           </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          {order.status === 'awaiting_arrival' && (
-                            <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700">
-                              Mark Arrived
-                            </Button>
+                        </TableCell>
+                        <TableCell className="text-gray-600">
+                          {order.expected_date ? (
+                            <div className="flex items-center space-x-1">
+                              <Calendar className="h-3 w-3" />
+                              <span>{formatDate(order.expected_date)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
                           )}
-                          {order.status === 'ready_for_collection' && (
-                            <Button variant="outline" size="sm" className="text-blue-600 hover:text-blue-700">
-                              Mark Collected
+                        </TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex justify-end space-x-2">
+                            {order.status === 'awaiting_arrival' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-green-600 hover:text-green-700"
+                                onClick={() => handleMarkArrived(order.id)}
+                                title="Mark item as arrived and ready for collection"
+                              >
+                                Mark as Arrived
+                              </Button>
+                            )}
+                            
+                            {order.status === 'ready_for_collection' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-purple-600 hover:text-purple-700"
+                                onClick={() => handleMarkCollected(order.id)}
+                                title="Mark order as collected"
+                              >
+                                Mark Collected
+                              </Button>
+                            )}
+                            
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              title="View order details"
+                            >
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          )}
-                          <Button variant="outline" size="sm">
-                            <Phone className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    </OrderDetailDrawer>
                   ))}
                 </TableBody>
               </Table>
@@ -340,10 +385,9 @@ export function CustomerOrders() {
         </TabsContent>
       </Tabs>
 
-      {/* Results Summary */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
-          Showing {filteredOrders.length} of {orders.length} orders
+          Showing {filteredOrders.length} of {customerOrders.length} orders
         </p>
       </div>
     </div>

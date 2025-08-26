@@ -32,6 +32,10 @@ export interface CustomerOrder {
   expected_date?: string;
   notes?: string;
   created_by?: string;
+  arrived_at?: string;
+  notified_at?: string;
+  collected_at?: string;
+  notification_sent?: boolean;
 }
 
 export interface StockItem {
@@ -229,15 +233,26 @@ export const usePharmacyData = () => {
 
   const updateOrderStatus = async (id: string, status: CustomerOrder['status']) => {
     try {
+      const updateData: any = { status };
+      
+      // Set timestamps based on status
+      if (status === 'ready_for_collection') {
+        updateData.arrived_at = new Date().toISOString();
+      } else if (status === 'collected') {
+        updateData.collected_at = new Date().toISOString();
+      }
+
       const { error } = await supabase
         .from('customer_orders')
-        .update({ status })
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
 
       setCustomerOrders(prev => prev.map(o => 
-        o.id === id ? { ...o, status } : o
+        o.id === id 
+          ? { ...o, status, ...updateData }
+          : o
       ));
 
       toast({

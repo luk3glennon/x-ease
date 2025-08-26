@@ -16,6 +16,8 @@ export type Database = {
     Tables: {
       customer_orders: {
         Row: {
+          arrived_at: string | null
+          collected_at: string | null
           created_by: string | null
           customer_name: string
           customer_phone: string | null
@@ -24,12 +26,16 @@ export type Database = {
           id: string
           item_name: string
           notes: string | null
+          notification_sent: boolean | null
+          notified_at: string | null
           order_type: string
           pharmacy_id: string
           status: string
           updated_at: string
         }
         Insert: {
+          arrived_at?: string | null
+          collected_at?: string | null
           created_by?: string | null
           customer_name: string
           customer_phone?: string | null
@@ -38,12 +44,16 @@ export type Database = {
           id?: string
           item_name: string
           notes?: string | null
+          notification_sent?: boolean | null
+          notified_at?: string | null
           order_type: string
           pharmacy_id?: string
           status?: string
           updated_at?: string
         }
         Update: {
+          arrived_at?: string | null
+          collected_at?: string | null
           created_by?: string | null
           customer_name?: string
           customer_phone?: string | null
@@ -52,6 +62,8 @@ export type Database = {
           id?: string
           item_name?: string
           notes?: string | null
+          notification_sent?: boolean | null
+          notified_at?: string | null
           order_type?: string
           pharmacy_id?: string
           status?: string
