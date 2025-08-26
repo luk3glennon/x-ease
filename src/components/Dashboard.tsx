@@ -13,8 +13,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import type { PharmacyView } from '@/types/pharmacy';
 
-export function Dashboard() {
+interface DashboardProps {
+  onViewChange: (view: PharmacyView) => void;
+}
+
+export function Dashboard({ onViewChange }: DashboardProps) {
   const alertCards = [
     {
       title: 'Orders To-Do',
