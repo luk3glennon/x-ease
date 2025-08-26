@@ -200,6 +200,33 @@ export const usePharmacyData = () => {
   };
 
   // Customer Order operations
+  const addCustomerOrder = async (order: Omit<CustomerOrder, 'id' | 'date_ordered'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('customer_orders')
+        .insert([order])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCustomerOrders(prev => [data as CustomerOrder, ...prev]);
+      toast({
+        title: "Success",
+        description: "Customer order created successfully"
+      });
+      return data;
+    } catch (error) {
+      console.error('Error adding customer order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create customer order",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const updateOrderStatus = async (id: string, status: CustomerOrder['status']) => {
     try {
       const { error } = await supabase
@@ -392,6 +419,7 @@ export const usePharmacyData = () => {
     deletePrescription,
     
     // Order actions
+    addCustomerOrder,
     updateOrderStatus,
     deleteOrder,
     

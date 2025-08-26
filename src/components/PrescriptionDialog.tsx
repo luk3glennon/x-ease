@@ -6,17 +6,24 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { usePharmacyData } from '@/hooks/usePharmacyData';
 import type { Prescription } from '@/hooks/usePharmacyData';
 
 interface PrescriptionDialogProps {
-  onAddPrescription: (prescription: Omit<Prescription, 'id' | 'date_created'>) => Promise<any>;
+  onAddPrescription?: (prescription: Omit<Prescription, 'id' | 'date_created'>) => Promise<any>;
   trigger?: React.ReactNode;
+  children?: React.ReactNode;
+  onPrescriptionCreated?: () => void;
 }
 
-export const PrescriptionDialog = ({ onAddPrescription, trigger }: PrescriptionDialogProps) => {
+export const PrescriptionDialog = ({ onAddPrescription, trigger, children, onPrescriptionCreated }: PrescriptionDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { addPrescription } = usePharmacyData();
+  
+  // Use internal hook if no external handler provided
+  const handleAddPrescription = onAddPrescription || addPrescription;
   
   const [formData, setFormData] = useState({
     patient_name: '',
@@ -46,7 +53,7 @@ export const PrescriptionDialog = ({ onAddPrescription, trigger }: PrescriptionD
 
     try {
       setLoading(true);
-      await onAddPrescription({
+      await handleAddPrescription({
         ...formData,
         quantity: parseInt(formData.quantity),
         patient_dob: formData.patient_dob || undefined,
@@ -73,6 +80,7 @@ export const PrescriptionDialog = ({ onAddPrescription, trigger }: PrescriptionD
       });
       
       setOpen(false);
+      onPrescriptionCreated?.();
     } catch (error) {
       // Error is handled in the hook
     } finally {
@@ -87,7 +95,7 @@ export const PrescriptionDialog = ({ onAddPrescription, trigger }: PrescriptionD
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger || (
+        {children || trigger || (
           <Button className="bg-primary text-primary-foreground hover:bg-primary/90" title="Add a new prescription to the system">
             <Plus className="h-4 w-4" />
             Log New Prescription
