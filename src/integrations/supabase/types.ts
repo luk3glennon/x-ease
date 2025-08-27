@@ -166,6 +166,8 @@ export type Database = {
           pharmacy_id: string
           prescriber: string
           quantity: number
+          renewal_due_date: string | null
+          renewed_at: string | null
           special_instructions: string | null
           status: string
           updated_at: string
@@ -186,6 +188,8 @@ export type Database = {
           pharmacy_id?: string
           prescriber: string
           quantity: number
+          renewal_due_date?: string | null
+          renewed_at?: string | null
           special_instructions?: string | null
           status?: string
           updated_at?: string
@@ -206,11 +210,54 @@ export type Database = {
           pharmacy_id?: string
           prescriber?: string
           quantity?: number
+          renewal_due_date?: string | null
+          renewed_at?: string | null
           special_instructions?: string | null
           status?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      reminder_events: {
+        Row: {
+          channel: string
+          id: string
+          notes: string | null
+          pharmacy_id: string
+          prescription_id: string
+          reminder_type: string
+          sent_at: string
+          sent_by: string | null
+        }
+        Insert: {
+          channel: string
+          id?: string
+          notes?: string | null
+          pharmacy_id?: string
+          prescription_id: string
+          reminder_type: string
+          sent_at?: string
+          sent_by?: string | null
+        }
+        Update: {
+          channel?: string
+          id?: string
+          notes?: string | null
+          pharmacy_id?: string
+          prescription_id?: string
+          reminder_type?: string
+          sent_at?: string
+          sent_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_events_prescription_id_fkey"
+            columns: ["prescription_id"]
+            isOneToOne: false
+            referencedRelation: "prescriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stock_items: {
         Row: {
