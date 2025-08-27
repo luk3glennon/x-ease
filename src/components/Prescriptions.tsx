@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -17,58 +17,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Prescription } from '@/types/pharmacy';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { PrescriptionDialog } from './PrescriptionDialog';
+import { usePharmacyData } from '@/hooks/usePharmacyData';
+import { useToast } from '@/hooks/use-toast';
+import type { Prescription } from '@/hooks/usePharmacyData';
 
 export function Prescriptions() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-
-  // Mock data
-  const prescriptions: Prescription[] = [
-    {
-      id: '1',
-      pharmacyId: 'ph1',
-      patientName: 'Sarah Johnson',
-      patientDob: '1985-03-15',
-      patientPhone: '(555) 123-4567',
-      medication: 'Amoxicillin 500mg',
-      dosage: '1 tablet',
-      quantity: 30,
-      prescriber: 'Dr. Smith',
-      status: 'pending',
-      dateCreated: '2024-01-15T10:30:00Z',
-      specialInstructions: 'Take with food'
-    },
-    {
-      id: '2',
-      pharmacyId: 'ph1',
-      patientName: 'Mike Chen',
-      patientDob: '1972-08-22',
-      patientPhone: '(555) 987-6543',
-      medication: 'Lisinopril 10mg',
-      dosage: '1 tablet daily',
-      quantity: 90,
-      prescriber: 'Dr. Wilson',
-      status: 'ready',
-      dateCreated: '2024-01-14T14:20:00Z',
-      dateReady: '2024-01-15T09:15:00Z'
-    },
-    {
-      id: '3',
-      pharmacyId: 'ph1',
-      patientName: 'Emma Wilson',
-      patientDob: '1990-12-03',
-      patientPhone: '(555) 456-7890',
-      medication: 'Metformin 500mg',
-      dosage: '2 tablets daily',
-      quantity: 60,
-      prescriber: 'Dr. Brown',
-      status: 'collected',
-      dateCreated: '2024-01-13T16:45:00Z',
-      dateReady: '2024-01-14T11:30:00Z',
-      dateCollected: '2024-01-14T15:20:00Z'
-    }
-  ];
+  const { prescriptions, loading, updatePrescriptionStatus, deletePrescription } = usePharmacyData();
+  const { toast } = useToast();
 
   const getStatusBadge = (status: Prescription['status']) => {
     switch (status) {
@@ -91,8 +50,32 @@ export function Prescriptions() {
     });
   };
 
+  const handleMarkReady = async (prescriptionId: string) => {
+    try {
+      await updatePrescriptionStatus(prescriptionId, 'ready');
+      toast({
+        title: "Success",
+        description: "Prescription marked as ready for collection.",
+      });
+    } catch (error) {
+      // Error handled in hook
+    }
+  };
+
+  const handleMarkCollected = async (prescriptionId: string) => {
+    try {
+      await updatePrescriptionStatus(prescriptionId, 'collected');
+      toast({
+        title: "Success",
+        description: "Prescription marked as collected.",
+      });
+    } catch (error) {
+      // Error handled in hook
+    }
+  };
+
   const filteredPrescriptions = prescriptions.filter(prescription => {
-    const matchesSearch = prescription.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = prescription.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          prescription.medication.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          prescription.prescriber.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -100,6 +83,10 @@ export function Prescriptions() {
     
     return matchesSearch && matchesStatus;
   });
+
+  if (loading) {
+    return <div className="p-8">Loading prescriptions...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -109,10 +96,12 @@ export function Prescriptions() {
           <h1 className="text-2xl font-semibold text-gray-900">Prescriptions</h1>
           <p className="text-gray-600 mt-1">Manage and track all prescription orders</p>
         </div>
-        <Button className="bg-primary hover:bg-primary-hover text-white">
-          <Plus className="h-4 w-4 mr-2" />
-          Log New Prescription
-        </Button>
+        <PrescriptionDialog>
+          <Button className="bg-primary hover:bg-primary-hover text-white">
+            <Plus className="h-4 w-4 mr-2" />
+            Log New Prescription
+          </Button>
+        </PrescriptionDialog>
       </div>
 
       {/* Summary Cards */}
@@ -234,8 +223,8 @@ export function Prescriptions() {
                 <TableRow key={prescription.id} className="hover:bg-gray-50">
                   <TableCell>
                     <div>
-                      <div className="font-medium text-gray-900">{prescription.patientName}</div>
-                      <div className="text-sm text-gray-600">{prescription.patientPhone}</div>
+                      <div className="font-medium text-gray-900">{prescription.patient_name}</div>
+                      <div className="text-sm text-gray-600">{prescription.patient_phone || 'N/A'}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -256,18 +245,82 @@ export function Prescriptions() {
                     {getStatusBadge(prescription.status)}
                   </TableCell>
                   <TableCell className="text-gray-600">
-                    {formatDate(prescription.dateCreated)}
+                    {formatDate(prescription.date_created)}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end space-x-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <Sheet>
+                        <SheetTrigger asChild>
+                          <Button variant="ghost" size="sm" title="View prescription details">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </SheetTrigger>
+                        <SheetContent>
+                          <SheetHeader>
+                            <SheetTitle>Prescription Details</SheetTitle>
+                          </SheetHeader>
+                          <div className="mt-6 space-y-4">
+                            <div>
+                              <h4 className="font-semibold text-gray-900">Patient Information</h4>
+                              <p className="text-gray-600">{prescription.patient_name}</p>
+                              <p className="text-gray-600">{prescription.patient_phone || 'No phone'}</p>
+                              <p className="text-gray-600">{prescription.patient_address || 'No address'}</p>
+                              {prescription.patient_dob && (
+                                <p className="text-gray-600">DOB: {formatDate(prescription.patient_dob)}</p>
+                              )}
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-gray-900">Medication</h4>
+                              <p className="text-gray-600">{prescription.medication}</p>
+                              <p className="text-gray-600">{prescription.dosage} × {prescription.quantity}</p>
+                              <p className="text-gray-600">Prescribed by: {prescription.prescriber}</p>
+                            </div>
+                            {prescription.special_instructions && (
+                              <div>
+                                <h4 className="font-semibold text-gray-900">Special Instructions</h4>
+                                <p className="text-gray-600">{prescription.special_instructions}</p>
+                              </div>
+                            )}
+                            {prescription.insurance_info && (
+                              <div>
+                                <h4 className="font-semibold text-gray-900">Insurance Information</h4>
+                                <p className="text-gray-600">{prescription.insurance_info}</p>
+                              </div>
+                            )}
+                            <div>
+                              <h4 className="font-semibold text-gray-900">Status Information</h4>
+                              <p className="text-gray-600">Created: {formatDate(prescription.date_created)}</p>
+                              {prescription.date_ready && (
+                                <p className="text-gray-600">Ready: {formatDate(prescription.date_ready)}</p>
+                              )}
+                              {prescription.date_collected && (
+                                <p className="text-gray-600">Collected: {formatDate(prescription.date_collected)}</p>
+                              )}
+                            </div>
+                          </div>
+                        </SheetContent>
+                      </Sheet>
+                      
                       {prescription.status === 'pending' && (
-                        <Button variant="ghost" size="sm" className="text-green-600 hover:text-green-700">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-green-600 hover:text-green-700"
+                          onClick={() => handleMarkReady(prescription.id)}
+                          title="Mark as ready for collection"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                      
+                      {prescription.status === 'ready' && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-blue-600 hover:text-blue-700"
+                          onClick={() => handleMarkCollected(prescription.id)}
+                          title="Mark as collected"
+                        >
                           <CheckCircle className="h-4 w-4" />
                         </Button>
                       )}
