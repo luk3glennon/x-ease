@@ -3,7 +3,7 @@ import { PharmacyLayout } from '@/components/PharmacyLayout';
 import { Dashboard } from '@/components/Dashboard';
 import { Prescriptions } from '@/components/Prescriptions';
 import { CustomerOrders } from '@/components/CustomerOrders';
-import { Stock } from '@/components/Stock';
+import { Inventory } from '@/components/Inventory';
 import { Settings } from '@/components/Settings';
 import type { PharmacyView } from '@/types/pharmacy';
 
@@ -19,7 +19,7 @@ const Index = () => {
       case 'orders':
         return <CustomerOrders />;
       case 'stock':
-        return <Stock />;
+        return <Inventory />;
       case 'settings':
         return <Settings />;
       default:

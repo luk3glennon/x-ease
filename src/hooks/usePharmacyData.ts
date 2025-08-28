@@ -412,6 +412,152 @@ export const usePharmacyData = () => {
     }
   };
 
+  // New inventory operations
+  const addStockItem = async (itemData: Omit<StockItem, 'id' | 'last_updated'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('stock_items')
+        .insert([{ ...itemData, updated_by: 'System' }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setStockItems(prev => [data as StockItem, ...prev]);
+      toast({
+        title: "Success",
+        description: "Stock item added successfully"
+      });
+      return data;
+    } catch (error) {
+      console.error('Error adding stock item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add stock item",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const updateStockItem = async (id: string, itemData: Partial<StockItem>) => {
+    try {
+      const { error } = await supabase
+        .from('stock_items')
+        .update({ ...itemData, last_updated: new Date().toISOString(), updated_by: 'System' })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setStockItems(prev => prev.map(item => 
+        item.id === id 
+          ? { ...item, ...itemData, last_updated: new Date().toISOString() }
+          : item
+      ));
+
+      toast({
+        title: "Success",
+        description: "Stock item updated successfully"
+      });
+    } catch (error) {
+      console.error('Error updating stock item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update stock item",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const markAsOrdered = async (stockItemId: string, orderQuantity: number) => {
+    try {
+      const stockItem = stockItems.find(item => item.id === stockItemId);
+      if (!stockItem) throw new Error('Stock item not found');
+
+      const orderData = {
+        item_name: stockItem.name,
+        current_stock: stockItem.current_stock,
+        order_quantity: orderQuantity,
+        supplier: stockItem.supplier || 'Unknown Supplier',
+        supplier_contact: stockItem.supplier_contact,
+        notes: `Ordered for ${stockItem.name}`,
+        status: 'ordered',
+        created_by: 'System'
+      };
+
+      const { data, error } = await supabase
+        .from('orders_todo')
+        .insert([orderData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setOrdersTodo(prev => [data as OrderTodo, ...prev]);
+      toast({
+        title: "Success",
+        description: "Item marked as ordered"
+      });
+    } catch (error) {
+      console.error('Error marking as ordered:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark item as ordered",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const markAsReceived = async (orderId: string, quantityReceived: number) => {
+    try {
+      const order = ordersTodo.find(o => o.id === orderId);
+      if (!order) throw new Error('Order not found');
+
+      // Create delivery log entry
+      const deliveryData = {
+        item_name: order.item_name,
+        quantity_received: quantityReceived,
+        supplier: order.supplier,
+        notes: `Received from order: ${order.id}`,
+        received_by: 'System'
+      };
+
+      const { error: deliveryError } = await supabase
+        .from('delivery_log')
+        .insert([deliveryData]);
+
+      if (deliveryError) throw deliveryError;
+
+      // Update stock quantity
+      const stockItem = stockItems.find(item => item.name === order.item_name);
+      if (stockItem) {
+        const newStock = stockItem.current_stock + quantityReceived;
+        await updateStock(stockItem.id, newStock);
+      }
+
+      // Remove from orders todo
+      await deleteOrderTodo(orderId);
+
+      // Refresh delivery log
+      await fetchData();
+
+      toast({
+        title: "Success",
+        description: "Item marked as received and stock updated"
+      });
+    } catch (error) {
+      console.error('Error marking as received:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark item as received",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -442,6 +588,12 @@ export const usePharmacyData = () => {
     updateStock,
     addOrderTodo,
     markOrderTodoAsOrdered,
-    deleteOrderTodo
+    deleteOrderTodo,
+    
+    // New inventory actions
+    addStockItem,
+    updateStockItem,
+    markAsOrdered,
+    markAsReceived
   };
 };
