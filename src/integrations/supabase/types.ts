@@ -104,6 +104,51 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_settings: {
+        Row: {
+          created_at: string
+          email_enabled: boolean
+          id: string
+          overdue_reminder_email_template: string | null
+          overdue_reminder_sms_template: string | null
+          pharmacy_id: string
+          ready_pickup_email_template: string | null
+          ready_pickup_sms_template: string | null
+          sms_enabled: boolean
+          special_order_email_template: string | null
+          special_order_sms_template: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email_enabled?: boolean
+          id?: string
+          overdue_reminder_email_template?: string | null
+          overdue_reminder_sms_template?: string | null
+          pharmacy_id?: string
+          ready_pickup_email_template?: string | null
+          ready_pickup_sms_template?: string | null
+          sms_enabled?: boolean
+          special_order_email_template?: string | null
+          special_order_sms_template?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email_enabled?: boolean
+          id?: string
+          overdue_reminder_email_template?: string | null
+          overdue_reminder_sms_template?: string | null
+          pharmacy_id?: string
+          ready_pickup_email_template?: string | null
+          ready_pickup_sms_template?: string | null
+          sms_enabled?: boolean
+          special_order_email_template?: string | null
+          special_order_sms_template?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders_todo: {
         Row: {
           created_at: string
@@ -145,6 +190,42 @@ export type Database = {
           status?: string
           supplier?: string
           supplier_contact?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      organization_settings: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string | null
+          id: string
+          license_number: string | null
+          name: string
+          pharmacy_id: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          license_number?: string | null
+          name?: string
+          pharmacy_id?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          license_number?: string | null
+          name?: string
+          pharmacy_id?: string
+          phone?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -298,6 +379,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          pharmacy_id: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          pharmacy_id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          pharmacy_id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -306,7 +423,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      user_role: "admin" | "pharmacist" | "technician"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -433,6 +550,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      user_role: ["admin", "pharmacist", "technician"],
+    },
   },
 } as const
